@@ -3,12 +3,13 @@ import SearchBox from '../components/SearchBox'
 import ItemList from '../components/ItemList'
 import { filterData } from '../utils/filterData'
 import { countDOMNodes } from '../utils/measurePerformance'
+import useFrameAndTaskTracker from '../hooks/useFrameAndTaskTracker'
 
-function VersionBUseTransition({ items, searchTerm, inputStartTime, onSearchTermChange, onPerformanceUpdate, isPending }) {
+function VersionBUseTransition({ items, searchTerm, onSearchTermChange, onPerformanceUpdate, isPending }) {
   const [localSearchTerm, setLocalSearchTerm] = useState('')
   const [deferredSearchTerm, setDeferredSearchTerm] = useState('')
-  const lastMeasuredInputRef = useRef(null)
   const [isPendingTransition, startTransition] = useTransition()
+  const measureKeystroke = useFrameAndTaskTracker()
 
   const activeSearchTerm = searchTerm ?? localSearchTerm
 
@@ -18,7 +19,6 @@ function VersionBUseTransition({ items, searchTerm, inputStartTime, onSearchTerm
     const start = window.performance.now()
     const result = filterData(items, deferredSearchTerm)
     filteringTimeRef.current = window.performance.now() - start
-    console.log('[B] filteringTime:', filteringTimeRef.current.toFixed(3), 'ms')
     return { items: result }
   }, [items, deferredSearchTerm])
 
@@ -30,17 +30,6 @@ function VersionBUseTransition({ items, searchTerm, inputStartTime, onSearchTerm
     })
   }, [filteredData])
 
-  useEffect(() => {
-    if (
-      inputStartTime == null ||
-      inputStartTime === lastMeasuredInputRef.current
-    ) {
-      return
-    }
-    onPerformanceUpdate?.({ updateCompletionTime: performance.now() - inputStartTime })
-    lastMeasuredInputRef.current = inputStartTime
-  }, [filteredData, inputStartTime])
-
   const handleChange = (value) => {
     const start = performance.now()
 
@@ -50,8 +39,16 @@ function VersionBUseTransition({ items, searchTerm, inputStartTime, onSearchTerm
       setDeferredSearchTerm(value)
     })
 
+    measureKeystroke(start, ({ fps, longestTask, mainThreadBusyPercent }) => {
+      console.log('[B] fps:', fps.toFixed(3), 'FPS')
+      console.log('[B] longestTask:', longestTask.toFixed(3), 'ms')
+      console.log('[B] mainThreadBusyPercent:', mainThreadBusyPercent.toFixed(3), '%')
+    })
+
     requestAnimationFrame(() => {
-      onPerformanceUpdate?.({ inputLatency: performance.now() - start })
+      requestAnimationFrame(() => {
+        onPerformanceUpdate?.({ inputLatency: performance.now() - start })
+      })
     })
   }
 

@@ -1,10 +1,10 @@
-import { Profiler, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import VersionSelector from './components/VersionSelector'
 import PerformanceMetrics from './components/PerformanceMetrics'
 import VersionATraditional from './versions/VersionA_Traditional'
 import VersionBUseTransition from './versions/VersionB_useTransition'
 import VersionCUseDeferredValue from './versions/VersionC_useDeferredValue'
-import { calculateStats, countDOMNodes } from './utils/measurePerformance'
+import { calculateStats } from './utils/measurePerformance'
 import generateData from './utils/generateData'
 
 const versionComponents = {
@@ -17,22 +17,16 @@ function App() {
   const [version, setVersion] = useState('A')
   const [datasetSize, setDatasetSize] = useState(1000)
   const [searchTerm, setSearchTerm] = useState('')
-  const [inputStartTime, setInputStartTime] = useState(null)
   const [items, setItems] = useState([])
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [metrics, setMetrics] = useState({
-    renderTime: 0,
-    commitTime: 0,
     filteringTime: 0,
     inputLatency: 0,
-    updateCompletionTime: 0,
     domNodeCount: 0,
     totalItemsRendered: 0,
   })
   const [measurements, setMeasurements] = useState([])
   const [interactionCount, setInteractionCount] = useState(0)
-
-  const profilerSignatureRef = useRef('')
 
   useEffect(() => {
     let isCancelled = false
@@ -72,7 +66,6 @@ function App() {
   }, [datasetSize])
 
   const handleSearchTermChange = (value) => {
-    setInputStartTime(performance.now())
     setSearchTerm(value)
     setInteractionCount((count) => count + 1)
   }
@@ -84,11 +77,8 @@ function App() {
       const entry = {
         version,
         datasetSize,
-        renderTime: nextMetrics.renderTime ?? lastEntry?.renderTime ?? 0,
-        commitTime: nextMetrics.commitTime ?? lastEntry?.commitTime ?? 0,
         filteringTime: nextMetrics.filteringTime ?? lastEntry?.filteringTime ?? 0,
         inputLatency: nextMetrics.inputLatency ?? lastEntry?.inputLatency ?? 0,
-        updateCompletionTime: nextMetrics.updateCompletionTime ?? lastEntry?.updateCompletionTime ?? 0,
         domNodeCount: nextMetrics.domNodeCount ?? lastEntry?.domNodeCount ?? 0,
         totalItemsRendered: nextMetrics.totalItemsRendered ?? lastEntry?.totalItemsRendered ?? 0,
       }
@@ -96,32 +86,12 @@ function App() {
     })
   }, [version, datasetSize])
 
-  const versionRef = useRef(version)
-  const datasetSizeRef = useRef(datasetSize)
-  const searchTermRef = useRef(searchTerm)
-  const itemsLengthRef = useRef(items.length)
-
-  useEffect(() => { versionRef.current = version }, [version])
-  useEffect(() => { datasetSizeRef.current = datasetSize }, [datasetSize])
-  useEffect(() => { searchTermRef.current = searchTerm }, [searchTerm])
-  useEffect(() => { itemsLengthRef.current = items.length }, [items])
-
-  const handleProfilerRender = useCallback((id, phase, actualDuration, baseDuration, startTime, commitTime) => {
-    const signature = `${versionRef.current}-${datasetSizeRef.current}-${searchTermRef.current}-${itemsLengthRef.current}`
-    if (profilerSignatureRef.current === signature) return
-    profilerSignatureRef.current = signature
-    handlePerformanceUpdate({ renderTime: actualDuration, commitTime: commitTime - startTime })
-  }, [handlePerformanceUpdate])
-
   const handleReset = () => {
     setMeasurements([])
     setInteractionCount(0)
     setMetrics({
-      renderTime: 0,
-      commitTime: 0,
       filteringTime: 0,
       inputLatency: 0,
-      updateCompletionTime: 0,
       domNodeCount: 0,
       totalItemsRendered: 0,
     })
@@ -143,11 +113,8 @@ function App() {
   }
 
   const stats = useMemo(() => ({
-    render: calculateStats(measurements.map((entry) => entry.renderTime)),
-    commit: calculateStats(measurements.map((entry) => entry.commitTime)),
     filter: calculateStats(measurements.map((entry) => entry.filteringTime)),
     inputLatency: calculateStats(measurements.map((entry) => entry.inputLatency)),
-    updateCompletion: calculateStats(measurements.map((entry) => entry.updateCompletionTime)),
     nodes: calculateStats(measurements.map((entry) => entry.domNodeCount)),
   }), [measurements])
 
@@ -188,16 +155,13 @@ function App() {
             </div>
           </div>
 
-          <Profiler id={`version-${version}`} onRender={handleProfilerRender}>
-            <CurrentVersion
-              items={items}
-              searchTerm={searchTerm}
-              inputStartTime={inputStartTime}
-              onSearchTermChange={handleSearchTermChange}
-              onPerformanceUpdate={handlePerformanceUpdate}
-              isPending={isLoadingData}
-            />
-          </Profiler>
+          <CurrentVersion
+            items={items}
+            searchTerm={searchTerm}
+            onSearchTermChange={handleSearchTermChange}
+            onPerformanceUpdate={handlePerformanceUpdate}
+            isPending={isLoadingData}
+          />
         </section>
 
         <aside className="sidebar-panel">
